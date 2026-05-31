@@ -31,8 +31,10 @@ export interface Recipe {
   calories_per_person: number
   cook_time_minutes: number
   difficulty: 'Easy' | 'Medium' | 'Hard'
+  uses_other_ingredients: boolean
   ingredients: { name: string; quantity: string }[]
   steps: string[]
+  image_url?: string | null
   selected: boolean
   created_at: string
 }

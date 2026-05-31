@@ -4,15 +4,26 @@ import { Recipe } from '@/lib/types'
 interface Props {
   recipe: Recipe
   servings: number
+  imageUrl?: string | null
 }
 
-export function RecipeImageCard({ recipe, servings }: Props) {
+export function RecipeImageCard({ recipe, servings, imageUrl }: Props) {
   return (
     <div
       id="recipe-card"
       className="bg-white w-[600px] font-sans"
       style={{ fontFamily: 'Inter, sans-serif' }}
     >
+      {/* Dish image */}
+      {imageUrl && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={imageUrl}
+          alt={recipe.dish_name}
+          className="w-full h-48 object-cover"
+          crossOrigin="anonymous"
+        />
+      )}
       {/* Header */}
       <div className="bg-orange-500 px-8 py-6">
         <p className="text-orange-100 text-sm font-medium uppercase tracking-widest mb-1">क्या बनाना है?</p>

@@ -10,6 +10,7 @@ export default function RecipePage() {
   const router = useRouter()
 
   const [recipe, setRecipe] = useState<Recipe | null>(null)
+  const [imageUrl, setImageUrl] = useState<string | null>(null)
   const [servings, setServings] = useState(2)
   const [langCode, setLangCode] = useState('en')
   const [translatedRecipe, setTranslatedRecipe] = useState<Recipe | null>(null)
@@ -25,6 +26,9 @@ export default function RecipePage() {
       .then(d => {
         setRecipe(d.recipe)
         setServings(d.servings ?? 2)
+        fetch(`/api/images/search?q=${encodeURIComponent(d.recipe.dish_name)}`)
+          .then(r => r.json())
+          .then(img => setImageUrl(img.url ?? null))
       })
     fetch('/api/user/profile')
       .then(r => r.json())
@@ -118,7 +122,7 @@ export default function RecipePage() {
         {/* Recipe card preview */}
         <div className="overflow-x-auto">
           <div ref={cardRef}>
-            {displayRecipe && <RecipeImageCard recipe={displayRecipe} servings={servings} />}
+            {displayRecipe && <RecipeImageCard recipe={displayRecipe} servings={servings} imageUrl={imageUrl} />}
           </div>
         </div>
 

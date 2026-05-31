@@ -33,6 +33,8 @@ create table recipes (
   calories_per_person int,
   cook_time_minutes int,
   difficulty text,
+  uses_other_ingredients boolean default false,
+  image_url text,
   ingredients jsonb default '[]',
   steps jsonb default '[]',
   selected boolean default false,

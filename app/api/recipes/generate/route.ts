@@ -35,12 +35,14 @@ export async function POST(req: NextRequest) {
   const neverShowList = neverShow?.map((r: any) => r.dish_name) ?? []
   const allExclude = [...neverShowList, ...(excludeDishes ?? [])]
 
-  const systemPrompt = `You are a helpful cooking assistant. Generate exactly 5 unique recipe suggestions based on the user's ingredients and preferences. Respond ONLY with valid JSON, no markdown, no explanation.`
+  const hasOtherIngredients = resolvedOther && resolvedOther.length > 0
 
-  const userPrompt = `Generate 5 recipes.
+  const systemPrompt = `You are a helpful cooking assistant. Generate recipe suggestions based on the user's ingredients and preferences. Respond ONLY with valid JSON, no markdown, no explanation.`
+
+  const userPrompt = `Generate ${hasOtherIngredients ? '8' : '5'} recipes.
 
 Key ingredient: ${resolvedKey}
-Other available ingredients: ${resolvedOther?.join(', ') || 'none specified'}
+${hasOtherIngredients ? `Other available ingredients: ${resolvedOther.join(', ')}` : ''}
 Ingredients to avoid today: ${resolvedAvoid?.join(', ') || 'none'}
 Cooking for: ${resolvedServings} people
 User allergens: ${user.allergens?.join(', ') || 'none'}
@@ -48,18 +50,22 @@ Dietary preferences: ${user.dietary_prefs?.join(', ') || 'none'}
 Disliked ingredients: ${user.disliked_ingredients?.join(', ') || 'none'}
 ${allExclude.length > 0 ? `Do NOT suggest these dishes: ${allExclude.join(', ')}` : ''}
 
-Return a JSON array of exactly 5 objects with this structure:
-[
-  {
-    "dish_name": "string",
-    "description": "one sentence description",
-    "calories_per_person": number,
-    "cook_time_minutes": number,
-    "difficulty": "Easy" | "Medium" | "Hard",
-    "ingredients": [{"name": "string", "quantity": "string"}],
-    "steps": ["step 1 text", "step 2 text", ...]
-  }
-]`
+${hasOtherIngredients ? `Return exactly 8 recipes:
+- First 5 recipes MUST use the key ingredient AND incorporate the other available ingredients creatively.
+- Last 3 recipes MUST use ONLY the key ingredient (ignore the other ingredients for these 3).
+- Add a field "uses_other_ingredients": true for the first 5, and false for the last 3.` : `Return exactly 5 recipes using only the key ingredient.`}
+
+JSON structure for each recipe:
+{
+  "dish_name": "string",
+  "description": "one sentence description",
+  "calories_per_person": number,
+  "cook_time_minutes": number,
+  "difficulty": "Easy" | "Medium" | "Hard",
+  "uses_other_ingredients": boolean,
+  "ingredients": [{"name": "string", "quantity": "string"}],
+  "steps": ["step 1 text", "step 2 text", ...]
+}`
 
   const completion = await openai.chat.completions.create({
     model: 'gpt-4o',
@@ -87,7 +93,7 @@ Return a JSON array of exactly 5 objects with this structure:
     servings: resolvedServings,
   }).select().single()
 
-  const toInsert = recipes.slice(0, 5).map((r: any) => ({
+  const toInsert = recipes.map((r: any) => ({
     session_id: recipeSession.id,
     user_id: user.id,
     dish_name: r.dish_name,
@@ -95,6 +101,7 @@ Return a JSON array of exactly 5 objects with this structure:
     calories_per_person: r.calories_per_person,
     cook_time_minutes: r.cook_time_minutes,
     difficulty: r.difficulty,
+    uses_other_ingredients: r.uses_other_ingredients ?? false,
     ingredients: r.ingredients,
     steps: r.steps,
   }))
