@@ -33,6 +33,7 @@ export default function HistoryPage() {
   const [history, setHistory] = useState<Recipe[]>([])
   const [saved, setSaved] = useState<Recipe[]>([])
   const [loading, setLoading] = useState(true)
+  const [query, setQuery] = useState('')
 
   useEffect(() => {
     Promise.all([
@@ -45,8 +46,21 @@ export default function HistoryPage() {
     })
   }, [])
 
+  const q = query.toLowerCase().trim()
+  const filteredHistory = q ? history.filter(r =>
+    r.dish_name.toLowerCase().includes(q) ||
+    r.description?.toLowerCase().includes(q) ||
+    (r as any).recipe_sessions?.key_ingredient?.toLowerCase().includes(q)
+  ) : history
+
+  const filteredSaved = q ? saved.filter(r =>
+    r.dish_name.toLowerCase().includes(q) ||
+    r.description?.toLowerCase().includes(q) ||
+    (r as any).recipe_sessions?.key_ingredient?.toLowerCase().includes(q)
+  ) : saved
+
   // Group saved recipes by key ingredient
-  const savedGrouped = saved.reduce((acc, recipe) => {
+  const savedGrouped = filteredSaved.reduce((acc, recipe) => {
     const key = (recipe as any).recipe_sessions?.key_ingredient ?? 'Other'
     const k = key.charAt(0).toUpperCase() + key.slice(1)
     if (!acc[k]) acc[k] = []
@@ -71,19 +85,34 @@ export default function HistoryPage() {
       <main className="max-w-lg mx-auto px-4 py-8">
         <h1 className="text-2xl font-bold text-gray-900 mb-5">Your Recipes</h1>
 
+        {/* Search */}
+        <div className="relative mb-4">
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">🔍</span>
+          <input
+            type="text"
+            placeholder="Search by dish name or ingredient..."
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white"
+          />
+          {query && (
+            <button onClick={() => setQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-lg leading-none">×</button>
+          )}
+        </div>
+
         {/* Tabs */}
         <div className="flex bg-gray-100 rounded-xl p-1 mb-6">
           <button
             onClick={() => setTab('history')}
             className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-colors ${tab === 'history' ? 'bg-white text-orange-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
           >
-            🕐 History {history.length > 0 && <span className="ml-1 text-xs bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded-full">{history.length}</span>}
+            🕐 History {filteredHistory.length > 0 && <span className="ml-1 text-xs bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded-full">{filteredHistory.length}</span>}
           </button>
           <button
             onClick={() => setTab('saved')}
             className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-colors ${tab === 'saved' ? 'bg-white text-orange-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
           >
-            🔖 Saved {saved.length > 0 && <span className="ml-1 text-xs bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded-full">{saved.length}</span>}
+            🔖 Saved {filteredSaved.length > 0 && <span className="ml-1 text-xs bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded-full">{filteredSaved.length}</span>}
           </button>
         </div>
 
@@ -92,14 +121,14 @@ export default function HistoryPage() {
         {/* History tab */}
         {!loading && tab === 'history' && (
           <>
-            {history.length === 0 ? (
+            {filteredHistory.length === 0 ? (
               <div className="text-center text-gray-400 py-12">
                 <p className="text-4xl mb-3">🍽️</p>
-                <p>No recipes selected yet. <Link href="/cook" className="text-orange-500 underline">Start cooking!</Link></p>
+                <p>{q ? `No results for "${query}"` : <>No recipes selected yet. <Link href="/cook" className="text-orange-500 underline">Start cooking!</Link></>}</p>
               </div>
             ) : (
               <div className="space-y-3">
-                {history.map(recipe => <RecipeRow key={recipe.id} recipe={recipe} />)}
+                {filteredHistory.map(recipe => <RecipeRow key={recipe.id} recipe={recipe} />)}
               </div>
             )}
           </>
@@ -108,10 +137,10 @@ export default function HistoryPage() {
         {/* Saved tab */}
         {!loading && tab === 'saved' && (
           <>
-            {saved.length === 0 ? (
+            {filteredSaved.length === 0 ? (
               <div className="text-center text-gray-400 py-12">
                 <p className="text-4xl mb-3">🔖</p>
-                <p>No saved recipes yet.<br />Tap 🔖 on any recipe to save it.</p>
+                <p>{q ? `No saved recipes match "${query}"` : <>No saved recipes yet.<br />Tap 🔖 on any recipe to save it.</>}</p>
               </div>
             ) : (
               <div className="space-y-6">
