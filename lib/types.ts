@@ -44,6 +44,7 @@ export interface Recipe {
   steps: string[]
   image_url?: string | null
   selected: boolean
+  saved: boolean
   created_at: string
 }
 

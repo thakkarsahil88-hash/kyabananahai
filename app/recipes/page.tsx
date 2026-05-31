@@ -6,12 +6,13 @@ import { Recipe } from '@/lib/types'
 import Link from 'next/link'
 import Image from 'next/image'
 
-function RecipeCard({ recipe, onSelect, onNeverShow, onRegenerate, regenerating }: {
+function RecipeCard({ recipe, onSelect, onNeverShow, onRegenerate, regenerating, onSave }: {
   recipe: Recipe & { imageUrl?: string | null }
   onSelect: (r: Recipe) => void
   onNeverShow: (r: Recipe) => void
   onRegenerate: (r: Recipe) => void
   regenerating: boolean
+  onSave: (r: Recipe) => void
 }) {
   return (
     <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
@@ -35,7 +36,14 @@ function RecipeCard({ recipe, onSelect, onNeverShow, onRegenerate, regenerating 
             onClick={() => onSelect(recipe)}
             className="flex-1 py-2.5 bg-orange-500 text-white rounded-xl text-sm font-semibold hover:bg-orange-600 transition-colors"
           >
-            Select This Recipe
+            Select
+          </button>
+          <button
+            onClick={() => onSave(recipe)}
+            title={recipe.saved ? 'Unsave' : 'Save recipe'}
+            className={`px-3 py-2.5 border rounded-xl text-sm transition-colors ${recipe.saved ? 'border-orange-300 bg-orange-50 text-orange-500' : 'border-gray-200 text-gray-400 hover:bg-orange-50 hover:text-orange-400 hover:border-orange-200'}`}
+          >
+            {recipe.saved ? '🔖' : '🔖'}
           </button>
           <button
             onClick={() => onRegenerate(recipe)}
@@ -123,6 +131,16 @@ function RecipesContent() {
     setLoadingMore(false)
   }
 
+  const saveRecipe = async (recipe: Recipe) => {
+    const newSaved = !recipe.saved
+    setRecipes(prev => prev.map(r => r.id === recipe.id ? { ...r, saved: newSaved } : r))
+    await fetch('/api/recipes/save', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ recipeId: recipe.id, saved: newSaved }),
+    })
+  }
+
   const regenerateOne = async (recipe: Recipe) => {
     setRegeneratingId(recipe.id)
     const excludeNames = recipes.map(r => r.dish_name)
@@ -190,7 +208,7 @@ function RecipesContent() {
               </h2>
               <div className="space-y-4">
                 {withOthers.map(r => (
-                  <RecipeCard key={r.id} recipe={{ ...r, imageUrl: imageMap[r.id] }} onSelect={selectRecipe} onNeverShow={neverShow} onRegenerate={regenerateOne} regenerating={regeneratingId === r.id} />
+                  <RecipeCard key={r.id} recipe={{ ...r, imageUrl: imageMap[r.id] }} onSelect={selectRecipe} onNeverShow={neverShow} onRegenerate={regenerateOne} regenerating={regeneratingId === r.id} onSave={saveRecipe} />
                 ))}
               </div>
             </div>
@@ -200,7 +218,7 @@ function RecipesContent() {
               </h2>
               <div className="space-y-4">
                 {keyOnly.map(r => (
-                  <RecipeCard key={r.id} recipe={{ ...r, imageUrl: imageMap[r.id] }} onSelect={selectRecipe} onNeverShow={neverShow} onRegenerate={regenerateOne} regenerating={regeneratingId === r.id} />
+                  <RecipeCard key={r.id} recipe={{ ...r, imageUrl: imageMap[r.id] }} onSelect={selectRecipe} onNeverShow={neverShow} onRegenerate={regenerateOne} regenerating={regeneratingId === r.id} onSave={saveRecipe} />
                 ))}
               </div>
             </div>
@@ -208,7 +226,7 @@ function RecipesContent() {
         ) : (
           <div className="space-y-4">
             {visible.map(r => (
-              <RecipeCard key={r.id} recipe={{ ...r, imageUrl: imageMap[r.id] }} onSelect={selectRecipe} onNeverShow={neverShow} onRegenerate={regenerateOne} regenerating={regeneratingId === r.id} />
+              <RecipeCard key={r.id} recipe={{ ...r, imageUrl: imageMap[r.id] }} onSelect={selectRecipe} onNeverShow={neverShow} onRegenerate={regenerateOne} regenerating={regeneratingId === r.id} onSave={saveRecipe} />
             ))}
           </div>
         )}

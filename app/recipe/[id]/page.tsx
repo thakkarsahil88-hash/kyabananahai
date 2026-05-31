@@ -24,6 +24,7 @@ export default function RecipePage() {
   const [userWhatsapp, setUserWhatsapp] = useState('')
   const [cookWhatsapp, setCookWhatsapp] = useState('')
   const [modal, setModal] = useState<IngredientModal | null>(null)
+  const [saved, setSaved] = useState(false)
   const cardRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -31,6 +32,7 @@ export default function RecipePage() {
       .then(r => r.json())
       .then(d => {
         setRecipe(d.recipe)
+        setSaved(d.recipe.saved ?? false)
         setServings(d.servings ?? 2)
         fetch(`/api/images/search?q=${encodeURIComponent(d.recipe.dish_name)}`)
           .then(r => r.json())
@@ -81,6 +83,16 @@ export default function RecipePage() {
     router.push(`/cook?avoid=${encodeURIComponent(modal.ingredient)}`)
   }
 
+  const toggleSave = async () => {
+    const newSaved = !saved
+    setSaved(newSaved)
+    await fetch('/api/recipes/save', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ recipeId: id, saved: newSaved }),
+    })
+  }
+
   const downloadCard = async () => {
     setDownloading(true)
     const html2canvas = (await import('html2canvas')).default
@@ -129,7 +141,15 @@ export default function RecipePage() {
       <Navbar />
       <main className="max-w-3xl mx-auto px-4 py-8 space-y-6">
 
-        <button onClick={() => router.back()} className="text-sm text-orange-500 hover:underline">← Back to recipes</button>
+        <div className="flex items-center justify-between">
+          <button onClick={() => router.back()} className="text-sm text-orange-500 hover:underline">← Back to recipes</button>
+          <button
+            onClick={toggleSave}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${saved ? 'bg-orange-50 border-orange-300 text-orange-600' : 'bg-white border-gray-200 text-gray-500 hover:border-orange-300'}`}
+          >
+            {saved ? '🔖 Saved' : '🔖 Save Recipe'}
+          </button>
+        </div>
 
         {/* Ingredient availability section */}
         <div className="bg-white rounded-2xl p-5 shadow-sm">
