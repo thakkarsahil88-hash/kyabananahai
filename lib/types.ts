@@ -22,6 +22,13 @@ export interface RecipeSession {
   created_at: string
 }
 
+export interface Nutrition {
+  protein_g: number
+  carbs_g: number
+  fat_g: number
+  fiber_g: number
+}
+
 export interface Recipe {
   id: string
   session_id: string
@@ -32,6 +39,7 @@ export interface Recipe {
   cook_time_minutes: number
   difficulty: 'Easy' | 'Medium' | 'Hard'
   uses_other_ingredients: boolean
+  nutrition_per_person?: Nutrition | null
   ingredients: { name: string; quantity: string }[]
   steps: string[]
   image_url?: string | null

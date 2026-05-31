@@ -1,16 +1,22 @@
 'use client'
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { Navbar } from '@/components/Navbar'
 
-export default function CookPage() {
+function CookContent() {
   const { data: session } = useSession()
   const router = useRouter()
+  const searchParams = useSearchParams()
 
   const [keyIngredient, setKeyIngredient] = useState('')
   const [otherIngredients, setOtherIngredients] = useState('')
   const [avoidIngredients, setAvoidIngredients] = useState('')
+
+  useEffect(() => {
+    const avoid = searchParams.get('avoid')
+    if (avoid) setAvoidIngredients(avoid)
+  }, [searchParams])
   const [servings, setServings] = useState(2)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -113,4 +119,8 @@ export default function CookPage() {
       </main>
     </>
   )
+}
+
+export default function CookPage() {
+  return <Suspense><CookContent /></Suspense>
 }

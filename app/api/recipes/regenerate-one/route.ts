@@ -47,12 +47,13 @@ Return a JSON object (not array) with this structure:
   "cook_time_minutes": number,
   "difficulty": "Easy" | "Medium" | "Hard",
   "uses_other_ingredients": ${usesOther},
+  "nutrition_per_person": { "protein_g": number, "carbs_g": number, "fat_g": number, "fiber_g": number },
   "ingredients": [{"name": "string", "quantity": "string"}],
   "steps": ["step 1", "step 2", ...]
 }`
 
   const completion = await openai.chat.completions.create({
-    model: 'gpt-4o',
+    model: 'gpt-4o-mini',
     messages: [
       { role: 'system', content: 'You are a helpful cooking assistant. Respond ONLY with valid JSON.' },
       { role: 'user', content: prompt },
@@ -80,6 +81,7 @@ Return a JSON object (not array) with this structure:
     cook_time_minutes: r.cook_time_minutes,
     difficulty: r.difficulty,
     uses_other_ingredients: usesOther,
+    nutrition_per_person: r.nutrition_per_person ?? null,
     ingredients: r.ingredients,
     steps: r.steps,
   }).select().single()

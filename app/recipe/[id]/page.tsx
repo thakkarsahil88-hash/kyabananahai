@@ -5,6 +5,11 @@ import { Navbar } from '@/components/Navbar'
 import { RecipeImageCard } from '@/components/RecipeImageCard'
 import { Recipe, LANGUAGES } from '@/lib/types'
 
+interface IngredientModal {
+  ingredient: string
+  action: 'choose' | 'loading'
+}
+
 export default function RecipePage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
@@ -18,6 +23,7 @@ export default function RecipePage() {
   const [downloading, setDownloading] = useState(false)
   const [userWhatsapp, setUserWhatsapp] = useState('')
   const [cookWhatsapp, setCookWhatsapp] = useState('')
+  const [modal, setModal] = useState<IngredientModal | null>(null)
   const cardRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -52,6 +58,29 @@ export default function RecipePage() {
     setTranslating(false)
   }
 
+  const alterRecipe = async (action: 'substitute' | 'remove') => {
+    if (!modal) return
+    setModal({ ingredient: modal.ingredient, action: 'loading' })
+    const res = await fetch('/api/recipes/alter', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ recipeId: id, missingIngredient: modal.ingredient, action }),
+    })
+    const data = await res.json()
+    if (data.recipe) {
+      setRecipe(data.recipe)
+      setTranslatedRecipe(null)
+      setLangCode('en')
+    }
+    setModal(null)
+  }
+
+  const goBackWithAvoid = () => {
+    if (!modal) return
+    setModal(null)
+    router.push(`/cook?avoid=${encodeURIComponent(modal.ingredient)}`)
+  }
+
   const downloadCard = async () => {
     setDownloading(true)
     const html2canvas = (await import('html2canvas')).default
@@ -68,10 +97,12 @@ export default function RecipePage() {
   const whatsappText = () => {
     const r = displayRecipe
     if (!r) return ''
+    const n = r.nutrition_per_person
     const lines = [
       `*${r.dish_name}*`,
       `_${r.description}_`,
       `⏱ ${r.cook_time_minutes} min | 🔥 ${r.calories_per_person} cal/person | 👥 ${servings} servings`,
+      ...(n ? [`💪 Protein: ${n.protein_g}g | 🌾 Carbs: ${n.carbs_g}g | 🧈 Fat: ${n.fat_g}g | 🥦 Fibre: ${n.fiber_g}g`] : []),
       '',
       '*Ingredients:*',
       ...r.ingredients.map(i => `• ${i.name} — ${i.quantity}`),
@@ -97,8 +128,29 @@ export default function RecipePage() {
     <>
       <Navbar />
       <main className="max-w-3xl mx-auto px-4 py-8 space-y-6">
-        <div className="flex items-center justify-between">
-          <button onClick={() => router.back()} className="text-sm text-orange-500 hover:underline">← Back to recipes</button>
+
+        <button onClick={() => router.back()} className="text-sm text-orange-500 hover:underline">← Back to recipes</button>
+
+        {/* Ingredient availability section */}
+        <div className="bg-white rounded-2xl p-5 shadow-sm">
+          <h2 className="font-semibold text-gray-800 mb-1">Check your ingredients</h2>
+          <p className="text-sm text-gray-400 mb-4">Tap any ingredient you don't have</p>
+          <div className="space-y-2">
+            {recipe.ingredients.map((ing, i) => (
+              <div key={i} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
+                <div>
+                  <span className="text-sm font-medium text-gray-800">{ing.name}</span>
+                  <span className="text-sm text-gray-400 ml-2">{ing.quantity}</span>
+                </div>
+                <button
+                  onClick={() => setModal({ ingredient: ing.name, action: 'choose' })}
+                  className="text-xs px-2.5 py-1 rounded-full border border-red-200 text-red-400 hover:bg-red-50 transition-colors"
+                >
+                  Not available
+                </button>
+              </div>
+            ))}
+          </div>
         </div>
 
         {/* Language selector */}
@@ -163,6 +215,65 @@ export default function RecipePage() {
           )}
         </div>
       </main>
+
+      {/* Ingredient not available modal */}
+      {modal && (
+        <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 px-4 pb-6 sm:pb-0">
+          <div className="bg-white rounded-2xl w-full max-w-sm overflow-hidden shadow-xl">
+            {modal.action === 'loading' ? (
+              <div className="p-8 flex flex-col items-center gap-3">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500" />
+                <p className="text-gray-600 text-sm">Updating recipe...</p>
+              </div>
+            ) : (
+              <>
+                <div className="px-6 pt-6 pb-4">
+                  <h3 className="font-bold text-gray-900 text-lg">"{modal.ingredient}" not available</h3>
+                  <p className="text-gray-500 text-sm mt-1">What would you like to do?</p>
+                </div>
+                <div className="px-4 pb-4 space-y-2">
+                  <button
+                    onClick={() => alterRecipe('substitute')}
+                    className="w-full py-3 bg-orange-500 text-white rounded-xl font-semibold hover:bg-orange-600 transition-colors text-left px-4 flex items-center gap-3"
+                  >
+                    <span className="text-xl">🔄</span>
+                    <div>
+                      <p className="font-semibold">Substitute it</p>
+                      <p className="text-xs text-orange-100">Replace with a similar ingredient</p>
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => alterRecipe('remove')}
+                    className="w-full py-3 bg-gray-100 text-gray-800 rounded-xl font-semibold hover:bg-gray-200 transition-colors text-left px-4 flex items-center gap-3"
+                  >
+                    <span className="text-xl">✂️</span>
+                    <div>
+                      <p className="font-semibold">Remove it</p>
+                      <p className="text-xs text-gray-500">Adjust recipe without this ingredient</p>
+                    </div>
+                  </button>
+                  <button
+                    onClick={goBackWithAvoid}
+                    className="w-full py-3 bg-gray-100 text-gray-800 rounded-xl font-semibold hover:bg-gray-200 transition-colors text-left px-4 flex items-center gap-3"
+                  >
+                    <span className="text-xl">↩️</span>
+                    <div>
+                      <p className="font-semibold">Go back & avoid it</p>
+                      <p className="text-xs text-gray-500">Return to suggestions, pre-filled as avoid</p>
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => setModal(null)}
+                    className="w-full py-2.5 text-gray-400 text-sm hover:text-gray-600"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </>
   )
 }

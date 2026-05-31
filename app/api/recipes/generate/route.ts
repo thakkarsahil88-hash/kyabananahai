@@ -63,12 +63,13 @@ JSON structure for each recipe:
   "cook_time_minutes": number,
   "difficulty": "Easy" | "Medium" | "Hard",
   "uses_other_ingredients": boolean,
+  "nutrition_per_person": { "protein_g": number, "carbs_g": number, "fat_g": number, "fiber_g": number },
   "ingredients": [{"name": "string", "quantity": "string"}],
   "steps": ["step 1 text", "step 2 text", ...]
 }`
 
   const completion = await openai.chat.completions.create({
-    model: 'gpt-4o',
+    model: 'gpt-4o-mini',
     messages: [
       { role: 'system', content: systemPrompt },
       { role: 'user', content: userPrompt },
@@ -102,6 +103,7 @@ JSON structure for each recipe:
     cook_time_minutes: r.cook_time_minutes,
     difficulty: r.difficulty,
     uses_other_ingredients: r.uses_other_ingredients ?? false,
+    nutrition_per_person: r.nutrition_per_person ?? null,
     ingredients: r.ingredients,
     steps: r.steps,
   }))

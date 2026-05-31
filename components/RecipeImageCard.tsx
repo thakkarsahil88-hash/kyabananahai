@@ -117,8 +117,29 @@ export function RecipeImageCard({ recipe, servings, imageUrl }: Props) {
         </div>
       </div>
 
+      {/* Nutrition row */}
+      {recipe.nutrition_per_person && (
+        <div style={{ padding: '12px 24px 0', display: 'flex', gap: '8px' }}>
+          {[
+            { label: 'Protein', value: `${recipe.nutrition_per_person.protein_g}g`, color: '#3b82f6' },
+            { label: 'Carbs', value: `${recipe.nutrition_per_person.carbs_g}g`, color: '#f59e0b' },
+            { label: 'Fat', value: `${recipe.nutrition_per_person.fat_g}g`, color: '#ef4444' },
+            { label: 'Fibre', value: `${recipe.nutrition_per_person.fiber_g}g`, color: '#10b981' },
+          ].map((n, i) => (
+            <div key={i} style={{
+              flex: 1, backgroundColor: '#f9fafb', borderRadius: '8px',
+              padding: '8px 4px', textAlign: 'center',
+              borderTop: `3px solid ${n.color}`,
+            }}>
+              <div style={{ fontFamily: 'Inter, sans-serif', fontWeight: 700, fontSize: '13px', color: '#111827' }}>{n.value}</div>
+              <div style={{ fontFamily: 'Inter, sans-serif', fontSize: '9px', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.5px', marginTop: '2px' }}>{n.label}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* Divider */}
-      <div style={{ height: '1px', backgroundColor: '#f3e8d8', margin: '0 24px' }} />
+      <div style={{ height: '1px', backgroundColor: '#f3e8d8', margin: '12px 24px 0' }} />
 
       {/* Body: Ingredients + Steps */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0', padding: '20px 24px 16px' }}>
