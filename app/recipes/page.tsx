@@ -6,10 +6,12 @@ import { Recipe } from '@/lib/types'
 import Link from 'next/link'
 import Image from 'next/image'
 
-function RecipeCard({ recipe, onSelect, onNeverShow }: {
+function RecipeCard({ recipe, onSelect, onNeverShow, onRegenerate, regenerating }: {
   recipe: Recipe & { imageUrl?: string | null }
   onSelect: (r: Recipe) => void
   onNeverShow: (r: Recipe) => void
+  onRegenerate: (r: Recipe) => void
+  regenerating: boolean
 }) {
   return (
     <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
@@ -36,6 +38,14 @@ function RecipeCard({ recipe, onSelect, onNeverShow }: {
             Select This Recipe
           </button>
           <button
+            onClick={() => onRegenerate(recipe)}
+            disabled={regenerating}
+            title="Get a different recipe"
+            className="px-3 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-400 hover:bg-orange-50 hover:text-orange-400 hover:border-orange-200 transition-colors disabled:opacity-40"
+          >
+            {regenerating ? <span className="animate-spin inline-block">↻</span> : '↻'}
+          </button>
+          <button
             onClick={() => onNeverShow(recipe)}
             title="Never show this again"
             className="px-3 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-400 hover:bg-red-50 hover:text-red-400 hover:border-red-200 transition-colors"
@@ -58,6 +68,7 @@ function RecipesContent() {
   const [loadingMore, setLoadingMore] = useState(false)
   const [excludedDishes, setExcludedDishes] = useState<string[]>([])
   const [hidden, setHidden] = useState<string[]>([])
+  const [regeneratingId, setRegeneratingId] = useState<string | null>(null)
 
   useEffect(() => {
     if (!sessionId) return
@@ -112,6 +123,29 @@ function RecipesContent() {
     setLoadingMore(false)
   }
 
+  const regenerateOne = async (recipe: Recipe) => {
+    setRegeneratingId(recipe.id)
+    const excludeNames = recipes.map(r => r.dish_name)
+    const res = await fetch('/api/recipes/regenerate-one', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        recipeId: recipe.id,
+        sessionId,
+        excludeDishes: excludeNames,
+      }),
+    })
+    const data = await res.json()
+    if (data.recipe) {
+      setRecipes(prev => prev.map(r => r.id === recipe.id ? data.recipe : r))
+      // Fetch image for new recipe
+      fetch(`/api/images/search?q=${encodeURIComponent(data.recipe.dish_name)}`)
+        .then(r => r.json())
+        .then(img => setImageMap(prev => ({ ...prev, [data.recipe.id]: img.url ?? null })))
+    }
+    setRegeneratingId(null)
+  }
+
   const neverShow = async (recipe: Recipe) => {
     setHidden(prev => [...prev, recipe.id])
     await fetch('/api/recipes/never-show', {
@@ -156,7 +190,7 @@ function RecipesContent() {
               </h2>
               <div className="space-y-4">
                 {withOthers.map(r => (
-                  <RecipeCard key={r.id} recipe={{ ...r, imageUrl: imageMap[r.id] }} onSelect={selectRecipe} onNeverShow={neverShow} />
+                  <RecipeCard key={r.id} recipe={{ ...r, imageUrl: imageMap[r.id] }} onSelect={selectRecipe} onNeverShow={neverShow} onRegenerate={regenerateOne} regenerating={regeneratingId === r.id} />
                 ))}
               </div>
             </div>
@@ -166,7 +200,7 @@ function RecipesContent() {
               </h2>
               <div className="space-y-4">
                 {keyOnly.map(r => (
-                  <RecipeCard key={r.id} recipe={{ ...r, imageUrl: imageMap[r.id] }} onSelect={selectRecipe} onNeverShow={neverShow} />
+                  <RecipeCard key={r.id} recipe={{ ...r, imageUrl: imageMap[r.id] }} onSelect={selectRecipe} onNeverShow={neverShow} onRegenerate={regenerateOne} regenerating={regeneratingId === r.id} />
                 ))}
               </div>
             </div>
@@ -174,7 +208,7 @@ function RecipesContent() {
         ) : (
           <div className="space-y-4">
             {visible.map(r => (
-              <RecipeCard key={r.id} recipe={{ ...r, imageUrl: imageMap[r.id] }} onSelect={selectRecipe} onNeverShow={neverShow} />
+              <RecipeCard key={r.id} recipe={{ ...r, imageUrl: imageMap[r.id] }} onSelect={selectRecipe} onNeverShow={neverShow} onRegenerate={regenerateOne} regenerating={regeneratingId === r.id} />
             ))}
           </div>
         )}
