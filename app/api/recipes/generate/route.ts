@@ -10,7 +10,6 @@ export async function POST(req: NextRequest) {
 
   const { keyIngredient, otherIngredients, avoidIngredients, servings, excludeDishes, refSessionId } = await req.json()
 
-  // When requesting "5 more", pull original session data
   let resolvedKey = keyIngredient
   let resolvedOther = otherIngredients ?? []
   let resolvedAvoid = avoidIngredients ?? []
@@ -36,43 +35,30 @@ export async function POST(req: NextRequest) {
   const allExclude = [...neverShowList, ...(excludeDishes ?? [])]
 
   const hasOtherIngredients = resolvedOther && resolvedOther.length > 0
+  const count = hasOtherIngredients ? 8 : 5
 
-  const systemPrompt = `You are a helpful cooking assistant. Generate recipe suggestions based on the user's ingredients and preferences. Respond ONLY with valid JSON, no markdown, no explanation.`
+  // PHASE 1: generate summaries only (no ingredients, no steps) — very fast
+  const previewPrompt = `Generate ${count} recipe summaries. Be concise.
 
-  const userPrompt = `Generate ${hasOtherIngredients ? '8' : '5'} recipes.
+Key ingredient (MUST be included): ${resolvedKey}
+${hasOtherIngredients ? `Other ingredients to use: ${resolvedOther.join(', ')}` : ''}
+Avoid: ${resolvedAvoid?.join(', ') || 'none'}
+Servings: ${resolvedServings}
+Allergens: ${user.allergens?.join(', ') || 'none'}
+Dietary: ${user.dietary_prefs?.join(', ') || 'none'}
+Disliked: ${user.disliked_ingredients?.join(', ') || 'none'}
+${allExclude.length > 0 ? `Do NOT suggest: ${allExclude.join(', ')}` : ''}
 
-Key ingredient: ${resolvedKey}
-${hasOtherIngredients ? `Other available ingredients: ${resolvedOther.join(', ')}` : ''}
-Ingredients to avoid today: ${resolvedAvoid?.join(', ') || 'none'}
-Cooking for: ${resolvedServings} people
-User allergens: ${user.allergens?.join(', ') || 'none'}
-Dietary preferences: ${user.dietary_prefs?.join(', ') || 'none'}
-Disliked ingredients: ${user.disliked_ingredients?.join(', ') || 'none'}
-${allExclude.length > 0 ? `Do NOT suggest these dishes: ${allExclude.join(', ')}` : ''}
+${hasOtherIngredients ? `First 5 MUST use key ingredient + other ingredients. Last 3 use key ingredient only. Set uses_other_ingredients accordingly.` : ''}
 
-${hasOtherIngredients ? `Return exactly 8 recipes:
-- First 5 recipes MUST use the key ingredient AND incorporate the other available ingredients creatively.
-- Last 3 recipes MUST use ONLY the key ingredient (ignore the other ingredients for these 3).
-- Add a field "uses_other_ingredients": true for the first 5, and false for the last 3.` : `Return exactly 5 recipes using only the key ingredient.`}
-
-JSON structure for each recipe:
-{
-  "dish_name": "string",
-  "description": "one sentence description",
-  "calories_per_person": number,
-  "cook_time_minutes": number,
-  "difficulty": "Easy" | "Medium" | "Hard",
-  "uses_other_ingredients": boolean,
-  "nutrition_per_person": { "protein_g": number, "carbs_g": number, "fat_g": number, "fiber_g": number },
-  "ingredients": [{"name": "string", "quantity": "string"}],
-  "steps": ["step 1 text", "step 2 text", ...]
-}`
+Return JSON array of ${count} objects, each with ONLY these fields:
+{ "dish_name": string, "description": string (1 sentence), "calories_per_person": number, "cook_time_minutes": number, "difficulty": "Easy"|"Medium"|"Hard", "uses_other_ingredients": boolean, "nutrition_per_person": { "protein_g": number, "carbs_g": number, "fat_g": number, "fiber_g": number } }`
 
   const completion = await openai.chat.completions.create({
     model: 'gpt-4o-mini',
     messages: [
-      { role: 'system', content: systemPrompt },
-      { role: 'user', content: userPrompt },
+      { role: 'system', content: 'You are a cooking assistant. Respond ONLY with valid JSON.' },
+      { role: 'user', content: previewPrompt },
     ],
     response_format: { type: 'json_object' },
     temperature: 0.8,
@@ -104,8 +90,8 @@ JSON structure for each recipe:
     difficulty: r.difficulty,
     uses_other_ingredients: r.uses_other_ingredients ?? false,
     nutrition_per_person: r.nutrition_per_person ?? null,
-    ingredients: r.ingredients,
-    steps: r.steps,
+    ingredients: [],   // filled on demand in phase 2
+    steps: [],
   }))
 
   const { data: savedRecipes } = await admin.from('recipes').insert(toInsert).select()

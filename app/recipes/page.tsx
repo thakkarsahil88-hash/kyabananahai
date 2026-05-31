@@ -40,10 +40,10 @@ function RecipeCard({ recipe, onSelect, onNeverShow, onRegenerate, regenerating,
           </button>
           <button
             onClick={() => onSave(recipe)}
-            title={recipe.saved ? 'Unsave' : 'Save recipe'}
-            className={`px-3 py-2.5 border rounded-xl text-sm transition-colors ${recipe.saved ? 'border-orange-300 bg-orange-50 text-orange-500' : 'border-gray-200 text-gray-400 hover:bg-orange-50 hover:text-orange-400 hover:border-orange-200'}`}
+            title={recipe.saved ? 'Remove from saved' : 'Save recipe'}
+            className={`px-3 py-2.5 border rounded-xl text-sm font-medium transition-colors ${recipe.saved ? 'border-orange-300 bg-orange-50 text-orange-500' : 'border-gray-200 text-gray-400 hover:bg-orange-50 hover:text-orange-400 hover:border-orange-200'}`}
           >
-            {recipe.saved ? '🔖' : '🔖'}
+            {recipe.saved ? '🔖' : '☆'}
           </button>
           <button
             onClick={() => onRegenerate(recipe)}

@@ -59,7 +59,7 @@ function CookContent() {
 
         <div className="bg-white rounded-2xl p-5 shadow-sm space-y-5">
           <div>
-            <label className="text-sm font-semibold text-gray-700">Key Ingredient *</label>
+            <label className="text-sm font-semibold text-gray-700">Key Ingredient <span className="text-orange-500">*</span> <span className="text-gray-400 font-normal">(mandatory inclusion)</span></label>
             <input
               type="text"
               placeholder="e.g. Chicken, Paneer, Aloo..."

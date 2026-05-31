@@ -119,7 +119,9 @@ export function RecipeImageCard({ recipe, servings, imageUrl }: Props) {
 
       {/* Nutrition row */}
       {recipe.nutrition_per_person && (
-        <div style={{ padding: '12px 24px 0', display: 'flex', gap: '8px' }}>
+        <div style={{ padding: '12px 24px 0' }}>
+          <p style={{ fontFamily: 'Inter, sans-serif', fontSize: '9px', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '6px' }}>Nutrition per person</p>
+          <div style={{ display: 'flex', gap: '8px' }}>
           {[
             { label: 'Protein', value: `${recipe.nutrition_per_person.protein_g}g`, color: '#3b82f6' },
             { label: 'Carbs', value: `${recipe.nutrition_per_person.carbs_g}g`, color: '#f59e0b' },
@@ -135,6 +137,7 @@ export function RecipeImageCard({ recipe, servings, imageUrl }: Props) {
               <div style={{ fontFamily: 'Inter, sans-serif', fontSize: '9px', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.5px', marginTop: '2px' }}>{n.label}</div>
             </div>
           ))}
+          </div>
         </div>
       )}
 

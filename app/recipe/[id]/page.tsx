@@ -15,6 +15,7 @@ export default function RecipePage() {
   const router = useRouter()
 
   const [recipe, setRecipe] = useState<Recipe | null>(null)
+  const [expanding, setExpanding] = useState(false)
   const [imageUrl, setImageUrl] = useState<string | null>(null)
   const [servings, setServings] = useState(2)
   const [langCode, setLangCode] = useState('en')
@@ -28,22 +29,31 @@ export default function RecipePage() {
   const cardRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    fetch(`/api/recipes/${id}`)
-      .then(r => r.json())
-      .then(d => {
-        setRecipe(d.recipe)
-        setSaved(d.recipe.saved ?? false)
-        setServings(d.servings ?? 2)
-        fetch(`/api/images/search?q=${encodeURIComponent(d.recipe.dish_name)}`)
-          .then(r => r.json())
-          .then(img => setImageUrl(img.url ?? null))
-      })
-    fetch('/api/user/profile')
-      .then(r => r.json())
-      .then(d => {
-        setUserWhatsapp(d.user?.user_whatsapp ?? '')
-        setCookWhatsapp(d.user?.cook_whatsapp ?? '')
-      })
+    Promise.all([
+      fetch(`/api/recipes/${id}`).then(r => r.json()),
+      fetch('/api/user/profile').then(r => r.json()),
+    ]).then(([d, u]) => {
+      setRecipe(d.recipe)
+      setSaved(d.recipe?.saved ?? false)
+      setServings(d.servings ?? 2)
+      setUserWhatsapp(u.user?.user_whatsapp ?? '')
+      setCookWhatsapp(u.user?.cook_whatsapp ?? '')
+      fetch(`/api/images/search?q=${encodeURIComponent(d.recipe.dish_name)}`)
+        .then(r => r.json()).then(img => setImageUrl(img.url ?? null))
+
+      // Phase 2: expand if ingredients not yet loaded
+      if (!d.recipe?.ingredients?.length) {
+        setExpanding(true)
+        fetch('/api/recipes/expand', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ recipeId: d.recipe.id }),
+        }).then(r => r.json()).then(exp => {
+          if (exp.recipe) setRecipe(exp.recipe)
+          setExpanding(false)
+        })
+      }
+    })
   }, [id])
 
   const translate = async (code: string) => {
@@ -69,11 +79,7 @@ export default function RecipePage() {
       body: JSON.stringify({ recipeId: id, missingIngredient: modal.ingredient, action }),
     })
     const data = await res.json()
-    if (data.recipe) {
-      setRecipe(data.recipe)
-      setTranslatedRecipe(null)
-      setLangCode('en')
-    }
+    if (data.recipe) { setRecipe(data.recipe); setTranslatedRecipe(null); setLangCode('en') }
     setModal(null)
   }
 
@@ -110,7 +116,7 @@ export default function RecipePage() {
     const r = displayRecipe
     if (!r) return ''
     const n = r.nutrition_per_person
-    const lines = [
+    return [
       `*${r.dish_name}*`,
       `_${r.description}_`,
       `⏱ ${r.cook_time_minutes} min | 🔥 ${r.calories_per_person} cal/person | 👥 ${servings} servings`,
@@ -123,8 +129,7 @@ export default function RecipePage() {
       ...r.steps.map((s, i) => `${i + 1}. ${s}`),
       '',
       '_Sent via KyaBananaHai_',
-    ]
-    return lines.join('\n')
+    ].join('\n')
   }
 
   const displayRecipe = translatedRecipe ?? recipe
@@ -139,50 +144,48 @@ export default function RecipePage() {
   return (
     <>
       <Navbar />
-      <main className="max-w-3xl mx-auto px-4 py-8 space-y-6">
+      <main className="max-w-2xl mx-auto px-4 py-6 space-y-5">
 
+        {/* Top bar */}
         <div className="flex items-center justify-between">
-          <button onClick={() => router.back()} className="text-sm text-orange-500 hover:underline">← Back to recipes</button>
+          <button onClick={() => router.back()} className="text-sm text-orange-500 hover:underline">← Back</button>
           <button
             onClick={toggleSave}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${saved ? 'bg-orange-50 border-orange-300 text-orange-600' : 'bg-white border-gray-200 text-gray-500 hover:border-orange-300'}`}
           >
-            {saved ? '🔖 Saved' : '🔖 Save Recipe'}
+            {saved ? '🔖 Saved' : '🔖 Save'}
           </button>
         </div>
 
-        {/* Ingredient availability section */}
-        <div className="bg-white rounded-2xl p-5 shadow-sm">
-          <h2 className="font-semibold text-gray-800 mb-1">Check your ingredients</h2>
-          <p className="text-sm text-gray-400 mb-4">Tap any ingredient you don't have</p>
-          <div className="space-y-2">
-            {recipe.ingredients.map((ing, i) => (
-              <div key={i} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
-                <div>
-                  <span className="text-sm font-medium text-gray-800">{ing.name}</span>
-                  <span className="text-sm text-gray-400 ml-2">{ing.quantity}</span>
-                </div>
-                <button
-                  onClick={() => setModal({ ingredient: ing.name, action: 'choose' })}
-                  className="text-xs px-2.5 py-1 rounded-full border border-red-200 text-red-400 hover:bg-red-50 transition-colors"
-                >
-                  Not available
-                </button>
+        {/* Recipe card — scaled to fit screen */}
+        <div className="w-full overflow-hidden rounded-2xl">
+          <div style={{ transform: 'scale(1)', transformOrigin: 'top left' }} className="w-full">
+            <div className="overflow-x-auto">
+              <div ref={cardRef} style={{ width: 640 }}>
+                {displayRecipe && <RecipeImageCard recipe={displayRecipe} servings={servings} imageUrl={imageUrl} />}
               </div>
-            ))}
+            </div>
           </div>
         </div>
 
-        {/* Language selector */}
-        <div>
-          <p className="text-sm font-medium text-gray-600 mb-2">Recipe language</p>
+        {/* Loading indicator for ingredients/steps */}
+        {expanding && (
+          <div className="flex items-center gap-2 text-sm text-gray-400 bg-white rounded-xl p-3">
+            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-orange-400" />
+            Loading full recipe...
+          </div>
+        )}
+
+        {/* Language selector — AFTER recipe image */}
+        <div className="bg-white rounded-2xl p-4 shadow-sm">
+          <p className="text-sm font-medium text-gray-600 mb-3">Recipe language</p>
           <div className="flex flex-wrap gap-2">
             {LANGUAGES.map(lang => (
               <button
                 key={lang.code}
                 onClick={() => translate(lang.code)}
-                disabled={translating}
-                className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${langCode === lang.code ? 'bg-orange-500 text-white' : 'bg-white border border-gray-200 text-gray-600 hover:border-orange-300'}`}
+                disabled={translating || expanding}
+                className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${langCode === lang.code ? 'bg-orange-500 text-white' : 'bg-gray-50 border border-gray-200 text-gray-600 hover:border-orange-300'}`}
               >
                 {lang.label}
               </button>
@@ -191,52 +194,56 @@ export default function RecipePage() {
           {translating && <p className="text-sm text-gray-400 mt-2">Translating...</p>}
         </div>
 
-        {/* Recipe card preview */}
-        <div className="overflow-x-auto">
-          <div ref={cardRef}>
-            {displayRecipe && <RecipeImageCard recipe={displayRecipe} servings={servings} imageUrl={imageUrl} />}
+        {/* Check ingredients */}
+        {recipe.ingredients?.length > 0 && (
+          <div className="bg-white rounded-2xl p-5 shadow-sm">
+            <h2 className="font-semibold text-gray-800 mb-1">Check your ingredients</h2>
+            <p className="text-xs text-gray-400 mb-4">Tap any ingredient you don't have</p>
+            <div className="space-y-1">
+              {recipe.ingredients.map((ing, i) => (
+                <div key={i} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
+                  <div>
+                    <span className="text-sm font-medium text-gray-800">{ing.name}</span>
+                    <span className="text-sm text-gray-400 ml-2">{ing.quantity}</span>
+                  </div>
+                  <button
+                    onClick={() => setModal({ ingredient: ing.name, action: 'choose' })}
+                    className="text-xs px-2.5 py-1 rounded-full border border-red-200 text-red-400 hover:bg-red-50 transition-colors whitespace-nowrap ml-2"
+                  >
+                    Not available?
+                  </button>
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Actions */}
         <div className="flex flex-col gap-3">
           <button
             onClick={downloadCard}
-            disabled={downloading || translating}
+            disabled={downloading || translating || expanding}
             className="w-full py-3.5 bg-orange-500 text-white rounded-xl font-semibold hover:bg-orange-600 transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
           >
             {downloading ? <><div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" /> Generating image...</> : '⬇️ Download Recipe Card'}
           </button>
-
           {userWhatsapp && (
-            <a
-              href={`https://wa.me/${userWhatsapp.replace(/\D/g, '')}?text=${encodeURIComponent(whatsappText())}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="w-full py-3.5 bg-green-500 text-white rounded-xl font-semibold hover:bg-green-600 transition-colors text-center"
-            >
+            <a href={`https://wa.me/${userWhatsapp.replace(/\D/g, '')}?text=${encodeURIComponent(whatsappText())}`} target="_blank" rel="noopener noreferrer" className="w-full py-3.5 bg-green-500 text-white rounded-xl font-semibold hover:bg-green-600 transition-colors text-center">
               💬 Send to My WhatsApp
             </a>
           )}
-
           {cookWhatsapp && (
-            <a
-              href={`https://wa.me/${cookWhatsapp.replace(/\D/g, '')}?text=${encodeURIComponent(whatsappText())}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="w-full py-3.5 bg-green-600 text-white rounded-xl font-semibold hover:bg-green-700 transition-colors text-center"
-            >
+            <a href={`https://wa.me/${cookWhatsapp.replace(/\D/g, '')}?text=${encodeURIComponent(whatsappText())}`} target="_blank" rel="noopener noreferrer" className="w-full py-3.5 bg-green-600 text-white rounded-xl font-semibold hover:bg-green-700 transition-colors text-center">
               👨‍🍳 Send to Cook's WhatsApp
             </a>
           )}
-
           {!userWhatsapp && !cookWhatsapp && (
-            <p className="text-sm text-gray-400 text-center">Add WhatsApp numbers in <a href="/settings" className="text-orange-500 underline">Settings</a> to share directly.</p>
+            <p className="text-sm text-gray-400 text-center">Add WhatsApp numbers in <a href="/settings" className="text-orange-500 underline">Settings</a></p>
           )}
         </div>
       </main>
 
-      {/* Ingredient not available modal */}
+      {/* Ingredient modal */}
       {modal && (
         <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 px-4 pb-6 sm:pb-0">
           <div className="bg-white rounded-2xl w-full max-w-sm overflow-hidden shadow-xl">
@@ -248,46 +255,23 @@ export default function RecipePage() {
             ) : (
               <>
                 <div className="px-6 pt-6 pb-4">
-                  <h3 className="font-bold text-gray-900 text-lg">"{modal.ingredient}" not available</h3>
+                  <h3 className="font-bold text-gray-900 text-lg">"{modal.ingredient}" not available?</h3>
                   <p className="text-gray-500 text-sm mt-1">What would you like to do?</p>
                 </div>
                 <div className="px-4 pb-4 space-y-2">
-                  <button
-                    onClick={() => alterRecipe('substitute')}
-                    className="w-full py-3 bg-orange-500 text-white rounded-xl font-semibold hover:bg-orange-600 transition-colors text-left px-4 flex items-center gap-3"
-                  >
+                  <button onClick={() => alterRecipe('substitute')} className="w-full py-3 bg-orange-500 text-white rounded-xl font-semibold hover:bg-orange-600 transition-colors text-left px-4 flex items-center gap-3">
                     <span className="text-xl">🔄</span>
-                    <div>
-                      <p className="font-semibold">Substitute it</p>
-                      <p className="text-xs text-orange-100">Replace with a similar ingredient</p>
-                    </div>
+                    <div><p className="font-semibold">Substitute it</p><p className="text-xs text-orange-100">Replace with a similar ingredient</p></div>
                   </button>
-                  <button
-                    onClick={() => alterRecipe('remove')}
-                    className="w-full py-3 bg-gray-100 text-gray-800 rounded-xl font-semibold hover:bg-gray-200 transition-colors text-left px-4 flex items-center gap-3"
-                  >
+                  <button onClick={() => alterRecipe('remove')} className="w-full py-3 bg-gray-100 text-gray-800 rounded-xl font-semibold hover:bg-gray-200 transition-colors text-left px-4 flex items-center gap-3">
                     <span className="text-xl">✂️</span>
-                    <div>
-                      <p className="font-semibold">Remove it</p>
-                      <p className="text-xs text-gray-500">Adjust recipe without this ingredient</p>
-                    </div>
+                    <div><p className="font-semibold">Remove it</p><p className="text-xs text-gray-500">Adjust recipe without this ingredient</p></div>
                   </button>
-                  <button
-                    onClick={goBackWithAvoid}
-                    className="w-full py-3 bg-gray-100 text-gray-800 rounded-xl font-semibold hover:bg-gray-200 transition-colors text-left px-4 flex items-center gap-3"
-                  >
+                  <button onClick={goBackWithAvoid} className="w-full py-3 bg-gray-100 text-gray-800 rounded-xl font-semibold hover:bg-gray-200 transition-colors text-left px-4 flex items-center gap-3">
                     <span className="text-xl">↩️</span>
-                    <div>
-                      <p className="font-semibold">Go back & avoid it</p>
-                      <p className="text-xs text-gray-500">Return to suggestions, pre-filled as avoid</p>
-                    </div>
+                    <div><p className="font-semibold">Go back & avoid it</p><p className="text-xs text-gray-500">Pre-filled as avoid today</p></div>
                   </button>
-                  <button
-                    onClick={() => setModal(null)}
-                    className="w-full py-2.5 text-gray-400 text-sm hover:text-gray-600"
-                  >
-                    Cancel
-                  </button>
+                  <button onClick={() => setModal(null)} className="w-full py-2.5 text-gray-400 text-sm hover:text-gray-600">Cancel</button>
                 </div>
               </>
             )}
